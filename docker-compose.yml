@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: survey
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d survey"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./survey
+      dockerfile: Dockerfile.backend
+    env_file:
+      - ./survey/.env
+    environment:
+      # Override the .env values that only make sense for local (non-Docker) runs
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/survey
+      FRONTEND_URL: http://localhost:8501
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Streamlit employee chat UI
+  frontend:
+    build:
+      context: ./survey
+      dockerfile: Dockerfile.frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+
+  # React admin survey generator (served by nginx)
+  generator:
+    build:
+      context: ./survey generator
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
