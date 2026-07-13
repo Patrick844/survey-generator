@@ -113,7 +113,7 @@ This is the fastest way to get everything running. One command starts all servic
 
 ```bash
 git clone <your-repo-url>
-cd services/300-30-3
+cd survey-generator
 ```
 
 **2. Set up environment variables**
@@ -122,27 +122,16 @@ cd services/300-30-3
 cp survey/.env.example survey/.env
 ```
 
-Open `survey/.env` and fill in your values:
+Open `survey/.env` and fill in your OpenAI key. For Docker, that's the only value you need to set:
 
 ```env
 OPENAI_API_KEY=sk-...         # required
 OPENAI_MODEL=gpt-4o-mini      # optional, default: gpt-4o-mini
-DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/survey
-FRONTEND_URL=http://localhost:8501
-BACKEND_URL=http://backend:8000
 ```
 
-> **Using your own PostgreSQL?** Set `DATABASE_URL` to point to your host machine. On Mac/Linux with Docker Desktop, use `host.docker.internal` instead of `localhost`.
->
-> **Using Docker's built-in PostgreSQL?** Add the `db` service back to `docker-compose.yml` and set `DATABASE_URL=postgresql://postgres:postgres@db:5432/survey`.
+> **Database and service URLs are handled automatically.** `docker-compose.yml` runs a bundled PostgreSQL 16 container and injects the correct `DATABASE_URL`, `BACKEND_URL`, and `FRONTEND_URL` into each service — any values you put in `.env` for those are overridden for the Docker run, so you can leave them as-is.
 
-**3. Create the database**
-
-```bash
-psql -U postgres -c "CREATE DATABASE survey;"
-```
-
-**4. Build and start**
+**3. Build and start**
 
 ```bash
 docker compose up --build
@@ -154,7 +143,7 @@ First build takes ~2 minutes. Subsequent starts are instant:
 docker compose up
 ```
 
-**5. Verify everything is running**
+**4. Verify everything is running**
 
 ```bash
 docker compose ps
@@ -187,7 +176,7 @@ Run each component individually without Docker. Useful for active development.
 
 ```bash
 git clone <your-repo-url>
-cd services/300-30-3
+cd survey-generator
 ```
 
 **2. Set up environment variables**
@@ -276,6 +265,7 @@ All configuration goes in `survey/.env`. Copy from `survey/.env.example` to get 
 | ---------------- | -------- | ------------------------------------------------------ | --------------------------------------------------- |
 | `OPENAI_API_KEY` | Yes      | —                                                      | Your OpenAI API key                                 |
 | `OPENAI_MODEL`   | No       | `gpt-4o-mini`                                          | OpenAI model to use                                 |
+| `OPENAI_FAKE_MODE` | No     | `false`                                                | Skip real OpenAI calls (for local demos/tests)      |
 | `DATABASE_URL`   | No       | `postgresql://postgres:postgres@localhost:5432/survey` | PostgreSQL connection string                        |
 | `BACKEND_URL`    | No       | `http://127.0.0.1:8000`                                | Used by Streamlit to reach the backend              |
 | `FRONTEND_URL`   | No       | `http://localhost:8501`                                | Used by the backend to build shareable survey links |
@@ -476,7 +466,7 @@ The system supports 8 question types. Each has its own validation logic and form
 ## Project Structure
 
 ```
-300-30-3/
+survey-generator/
 ├── docker-compose.yml
 ├── README.md
 ├── DOCS.md                          ← full technical reference
@@ -490,7 +480,6 @@ The system supports 8 question types. Each has its own validation logic and form
 │   ├── backend/
 │   │   ├── main.py                  ← FastAPI app + all routes
 │   │   ├── models.py                ← Pydantic request/response schemas
-│   │   ├── questions.py             ← default 30-question set
 │   │   └── services/
 │   │       ├── chatbot.py           ← business logic + session state machine
 │   │       ├── ai_service.py        ← LLM facade
@@ -505,14 +494,21 @@ The system supports 8 question types. Each has its own validation logic and form
 │       ├── test_validator.py
 │       └── test_chatbot_navigation.py
 │
-└── survey generator/                ← React admin UI
+└── survey generator/                ← React admin UI (TypeScript + Vite)
     ├── src/
-    │   ├── App.jsx
+    │   ├── App.tsx
+    │   ├── main.tsx
+    │   ├── data/
+    │   │   └── questionBank.ts       ← default 30-question set
+    │   ├── types/
+    │   │   └── models.ts
     │   └── components/
-    │       ├── Header.jsx
-    │       ├── QuestionList.jsx
-    │       ├── QuestionCard.jsx
-    │       ├── QuestionForm.jsx
-    │       └── GenerateChatbotModal.jsx
+    │       ├── Header.tsx
+    │       ├── QuestionList.tsx
+    │       ├── QuestionCard.tsx
+    │       ├── QuestionForm.tsx
+    │       ├── QuestionLibrary.tsx
+    │       ├── AddQuestionChoice.tsx
+    │       └── GenerateChatbotModal.tsx
     └── Dockerfile
 ```
