@@ -239,37 +239,53 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
             queue_user_message(answer)
             st.rerun()
 
-    #  Number — a single numeric input, bounded to the allowed range
+    #  Number — free entry starting empty; Submit stays locked until in range
     elif question_type == "number":
         min_v = current_question.get("min_value")
         max_v = current_question.get("max_value")
-        num_kwargs: dict[str, Any] = {"step": 1.0, "key": f"num_{question_id}", "disabled": is_waiting}
-        if min_v is not None:
-            num_kwargs["min_value"] = float(min_v)
-        if max_v is not None:
-            num_kwargs["max_value"] = float(max_v)
-        num_kwargs["value"] = float(min_v) if min_v is not None else 0.0
-        st.write("**Enter your answer:**")
-        val = st.number_input("Your answer", label_visibility="collapsed", **num_kwargs)
-        if st.button("Submit answer", key=f"num_submit_{question_id}", disabled=is_waiting, type="primary"):
+        if min_v is not None and max_v is not None:
+            st.write(f"**Enter a number between {min_v:g} and {max_v:g}:**")
+        else:
+            st.write("**Enter your answer:**")
+        # No min/max on the widget itself — otherwise Streamlit silently clamps an
+        # out-of-range entry to the bound. We validate explicitly and lock Submit.
+        val = st.number_input(
+            "Your answer",
+            value=None,
+            step=1.0,
+            label_visibility="collapsed",
+            placeholder="Type a number",
+            key=f"num_{question_id}",
+            disabled=is_waiting,
+        )
+        in_range = (
+            val is not None
+            and (min_v is None or val >= float(min_v))
+            and (max_v is None or val <= float(max_v))
+        )
+        if val is not None and not in_range and min_v is not None and max_v is not None:
+            st.caption(f"⚠️ Must be between {min_v:g} and {max_v:g}.")
+        if st.button("Submit answer", key=f"num_submit_{question_id}", disabled=is_waiting or not in_range, type="primary"):
             num = int(val) if float(val).is_integer() else val
             queue_user_message(str(num))
             st.rerun()
 
-    #  Percentage — a 0–100 value
+    #  Percentage — 0–100, starting empty; Submit locked until valid
     elif question_type == "percentage":
         st.write("**Enter a percentage (0–100):**")
         pct_val = st.number_input(
             "Your answer",
+            value=None,
+            step=5.0,
             label_visibility="collapsed",
-            min_value=0,
-            max_value=100,
-            step=5,
-            value=0,
+            placeholder="0–100",
             key=f"pct_{question_id}",
             disabled=is_waiting,
         )
-        if st.button("Submit answer", key=f"pct_submit_{question_id}", disabled=is_waiting, type="primary"):
+        pct_ok = pct_val is not None and 0 <= pct_val <= 100
+        if pct_val is not None and not pct_ok:
+            st.caption("⚠️ Must be between 0 and 100.")
+        if st.button("Submit answer", key=f"pct_submit_{question_id}", disabled=is_waiting or not pct_ok, type="primary"):
             queue_user_message(f"{int(pct_val)}%")
             st.rerun()
 
