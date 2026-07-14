@@ -42,12 +42,6 @@ class LLMUserMessageAnalysis(BaseModel):
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
-class LLMReply(BaseModel):
-    """Structured output returned by OpenAI when composing chatbot copy."""
-
-    assistant_message: str
-
-
 class OpenAILLMService:
     """
     OpenAI-powered language layer.
@@ -159,16 +153,12 @@ Python validation will reject it and ask the user to resend with the correct for
         return "\n".join(lines)
 
     def compose_question_message(self, *, question: Question, number: int, total: int, greeting: bool = False) -> str:
+        # Deterministic (no LLM call) so each question appears instantly. The LLM
+        # is reserved for understanding the employee's answer, not for wording.
         block = self._question_block(question, number, total)
-        if not greeting:
-            return block
-        if self.fake_mode:
+        if greeting:
             return "Welcome — thanks for taking a few minutes to share your feedback.\n\n" + block
-        intro = self._compose_reply(
-            "Write ONE short, warm sentence welcoming an employee to a workplace survey. "
-            "Just the opening sentence — no question, no 'Sure', no 'Great'."
-        )
-        return f"{intro}\n\n{block}"
+        return block
 
     def compose_invalid_message(
         self,
@@ -178,30 +168,9 @@ Python validation will reject it and ask the user to resend with the correct for
         user_answer: str,
         normalized_answer: str | None,
     ) -> str:
-        if self.fake_mode:
-            return (
-                f"That response is not in the expected format. {error}\n\n"
-                f"Please resend your response based on this format: {question.expected_format}"
-            )
-
+        # Deterministic: state the error and show the correct format directly.
         format_guide = self._format_guide(question)
-        prompt = f"""
-Write a short chatbot message telling the employee their response is invalid.
-
-Requirements:
-- Be polite and direct — do not be vague.
-- State exactly what went wrong using the validation error below.
-- Show the correct format using the format guide below word-for-word.
-- Show a concrete example of a valid answer.
-- Do not ask a new question.
-
-Validation error: {error}
-Employee typed: {user_answer}
-Format guide: {format_guide}
-Question type: {question.question_type}
-Options (if any): {question.options}
-""".strip()
-        return self._compose_reply(prompt)
+        return f"{error}\n\n**How to answer:**\n{format_guide}"
 
     def compose_accepted_then_next_message(
         self,
@@ -212,16 +181,11 @@ Options (if any): {question.options}
         user_message: str,
         validated_answer: Any,
     ) -> str:
+        # Deterministic acknowledgment + next question — no LLM call, so moving
+        # between questions is instant (the only per-answer LLM call is the one
+        # that understands the answer).
         block = self._question_block(next_question, number, total)
-        if self.fake_mode:
-            return "Thanks, that's saved.\n\n" + block
-
-        ack = self._compose_reply(
-            "In ONE short, warm sentence, acknowledge that an employee's survey answer was received. "
-            "Do not restate their answer verbatim, do not ask anything, no 'Great'/'Wonderful'. "
-            f"For context, their answer was: {user_message}"
-        )
-        return f"{ack}\n\n{block}"
+        return "Thanks, that's saved.\n\n" + block
 
     def compose_edit_start_message(
         self,
@@ -231,30 +195,12 @@ Options (if any): {question.options}
         total: int,
         previous_answer: str,
     ) -> str:
-        if self.fake_mode:
-            return (
-                f"Sure — going back to Question {number}.\n\n"
-                f"Previous answer: `{previous_answer}`\n\n"
-                f"{self._template_question_message(question=question, number=number, total=total)}\n\n"
-                "Please send your updated answer."
-            )
-
-        prompt = f"""
-Write a chatbot message for editing a previous survey answer.
-
-Requirements:
-- Say we are going back to Question {number}.
-- Show previous answer exactly: {previous_answer}
-- Ask the same question again.
-- Include expected format exactly.
-- Include options exactly when provided.
-- End by asking the employee to send the updated answer.
-
-Question data:
-{question.model_dump()}
-Total questions: {total}
-""".strip()
-        return self._compose_reply(prompt)
+        return (
+            f"Sure — going back to Question {number}.\n\n"
+            f"Previous answer: `{previous_answer}`\n\n"
+            f"{self._question_block(question, number, total)}\n\n"
+            "Send your updated answer below."
+        )
 
     def compose_edit_saved_message(
         self,
@@ -264,105 +210,39 @@ Total questions: {total}
         total: int,
         completed: bool,
     ) -> str:
-        if self.fake_mode:
-            if completed or return_question is None or return_number is None:
-                return "Good, your previous answer was updated.\n\nGreat, the survey is complete. All your responses have been saved."
-            return (
-                "Good, your previous answer was updated.\n\n"
-                "Let's continue where we left off.\n\n"
-                + self._template_question_message(question=return_question, number=return_number, total=total)
-            )
-
-        prompt = f"""
-Write a chatbot message after the employee updated a previous answer.
-
-Requirements:
-- Start with: Good, your previous answer was updated.
-- If completed=true, tell them the survey is complete and responses are saved.
-- If completed=false, say: Let's continue where we left off.
-- If there is a return question, ask it next with question number, expected format, and options exactly.
-
-completed={completed}
-return_number={return_number}
-total={total}
-return_question={return_question.model_dump() if return_question is not None else None}
-""".strip()
-        return self._compose_reply(prompt)
+        if completed or return_question is None or return_number is None:
+            return "Your previous answer was updated.\n\nThe survey is complete — all your responses have been saved."
+        return (
+            "Your previous answer was updated.\n\nLet's continue where we left off.\n\n"
+            + self._question_block(return_question, return_number, total)
+        )
 
     def compose_completed_message(self, *, user_message: str, validated_answer: Any) -> str:
-        if self.fake_mode:
-            return (
-                "Great, the survey is complete. All your responses have been saved.\n\n"
-                "If you want to edit a previous answer, say something like: `go back to question 1`."
-            )
-
-        prompt = f"""
-Write a short friendly survey completion message.
-
-Requirements:
-- Briefly acknowledge the employee's final answer (user_message and validated_answer below) naturally — one short sentence.
-- Then say the survey is complete and all responses have been saved.
-- End by telling them they can still edit any answer by saying: go back to question 1.
-
-Employee's final raw answer: {user_message}
-Validated final answer (normalized): {validated_answer}
-""".strip()
-        return self._compose_reply(prompt)
+        return (
+            "🎉 That's the last one — the survey is complete. All your responses have been saved.\n\n"
+            "If you want to change an answer, type: `go back to question 1`."
+        )
 
     def compose_help_message(self, *, question: Question | None, number: int | None, total: int) -> str:
-        if self.fake_mode:
-            if question is None or number is None:
-                return "You can edit a previous answer by saying: go back to question 1."
-            return (
-                "No problem — answer the current question using this format:\n\n"
-                f"{question.expected_format}\n\n"
-                + self._template_question_message(question=question, number=number, total=total)
-            )
-
-        prompt = f"""
-Write a helpful chatbot message explaining how to answer or navigate.
-
-Requirements:
-- Mention they can type things like: go back to question 1.
-- If a current question exists, explain the expected format exactly and repeat the current question.
-
-Current number: {number}
-Total questions: {total}
-Question: {question.model_dump() if question is not None else None}
-""".strip()
-        return self._compose_reply(prompt)
+        if question is None or number is None:
+            return "You can revisit a previous answer by typing: `go back to question 1`."
+        return (
+            "No problem — here's the current question again:\n\n"
+            f"{self._question_block(question, number, total)}\n\n"
+            f"**How to answer:**\n{self._format_guide(question)}"
+        )
 
     def compose_progress_message(self, *, answered: int, total: int, completed: bool) -> str:
-        if self.fake_mode:
-            status = "complete" if completed else "in progress"
-            return f"You have answered {answered}/{total} questions. Current status: {status}."
-
-        prompt = f"Write a concise survey progress message. answered={answered}, total={total}, completed={completed}."
-        return self._compose_reply(prompt)
+        status = "complete" if completed else "in progress"
+        return f"You've answered {answered}/{total} questions. Status: {status}."
 
     def compose_unknown_message(self, *, question: Question | None, number: int | None, total: int) -> str:
-        if self.fake_mode:
-            if question is None or number is None:
-                return "I didn't fully understand. You can say: go back to question 1, show progress, or start again."
-            return (
-                "I didn't fully understand. Please answer the current question using the expected format.\n\n"
-                + self._template_question_message(question=question, number=number, total=total)
-            )
-
-        prompt = f"""
-Write a short chatbot recovery message because the user's message was unclear.
-
-Requirements:
-- Be friendly.
-- Ask them to answer the current question using the expected format.
-- Mention they can type: go back to question 1.
-- If a current question exists, repeat it.
-
-Current number: {number}
-Total questions: {total}
-Question: {question.model_dump() if question is not None else None}
-""".strip()
-        return self._compose_reply(prompt)
+        if question is None or number is None:
+            return "I didn't quite catch that. You can type `go back to question 1`, `show progress`, or answer the current question."
+        return (
+            "I didn't quite catch that — here's the current question again:\n\n"
+            + self._question_block(question, number, total)
+        )
 
     def _format_guide(self, question: Question) -> str:
         """Returns a clear, type-specific format instruction to embed in every message."""
@@ -438,20 +318,6 @@ Question: {question.model_dump() if question is not None else None}
             )
 
         return f"Expected format: {question.expected_format}"
-
-    def _compose_reply(self, prompt: str) -> str:
-        response = self.client.responses.parse(
-            model=self.model,
-            input=[
-                {
-                    "role": "system",
-                    "content": "You write concise, warm chatbot messages for an employee survey app. Use markdown: blank lines between paragraphs, bullet lists where useful. Never use 'Great!', 'Wonderful!' or similar filler openers.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            text_format=LLMReply,
-        )
-        return response.output_parsed.assistant_message
 
     @property
     def client(self) -> Any:
@@ -565,17 +431,6 @@ Question: {question.model_dump() if question is not None else None}
             return ExtractedAnswer(free_text=cleaned) if cleaned else None
 
         return None
-
-    def _template_question_message(self, *, question: Question, number: int, total: int) -> str:
-        message = [
-            f"Question {number}/{total}",
-            question.prompt,
-            f"Expected format: {question.expected_format}",
-        ]
-        if question.options:
-            options = "\n".join(f"- {option}" for option in question.options)
-            message.append(f"Options:\n{options}")
-        return "\n\n".join(message)
 
     def _env_flag(self, name: str) -> bool:
         return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
