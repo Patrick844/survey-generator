@@ -239,6 +239,40 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
             queue_user_message(answer)
             st.rerun()
 
+    #  Number — a single numeric input, bounded to the allowed range
+    elif question_type == "number":
+        min_v = current_question.get("min_value")
+        max_v = current_question.get("max_value")
+        num_kwargs: dict[str, Any] = {"step": 1.0, "key": f"num_{question_id}", "disabled": is_waiting}
+        if min_v is not None:
+            num_kwargs["min_value"] = float(min_v)
+        if max_v is not None:
+            num_kwargs["max_value"] = float(max_v)
+        num_kwargs["value"] = float(min_v) if min_v is not None else 0.0
+        st.write("**Enter your answer:**")
+        val = st.number_input("Your answer", label_visibility="collapsed", **num_kwargs)
+        if st.button("Submit answer", key=f"num_submit_{question_id}", disabled=is_waiting, type="primary"):
+            num = int(val) if float(val).is_integer() else val
+            queue_user_message(str(num))
+            st.rerun()
+
+    #  Percentage — a 0–100 value
+    elif question_type == "percentage":
+        st.write("**Enter a percentage (0–100):**")
+        pct_val = st.number_input(
+            "Your answer",
+            label_visibility="collapsed",
+            min_value=0,
+            max_value=100,
+            step=5,
+            value=0,
+            key=f"pct_{question_id}",
+            disabled=is_waiting,
+        )
+        if st.button("Submit answer", key=f"pct_submit_{question_id}", disabled=is_waiting, type="primary"):
+            queue_user_message(f"{int(pct_val)}%")
+            st.rerun()
+
 
 def render_sidebar(session: dict[str, Any]) -> None:
     with st.sidebar:

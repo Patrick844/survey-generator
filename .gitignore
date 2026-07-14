@@ -252,4 +252,4 @@ lerna-debug.log*
 .DS_Store
 
 # Debug screenshots
-Screenshot*.png
+Screenshot*
