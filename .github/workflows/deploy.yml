@@ -80,8 +80,16 @@ jobs:
           ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" "
             set -e
             cd $DEPLOY_DIR
-            sudo docker compose --env-file .env.prod up -d --build
-            # The just-replaced image versions are now dangling — drop them too.
+            # Small root volume: free the running images first, then rebuild one
+            # service at a time (pruning cache between) so peak disk stays low.
+            # 'down' (no -v) keeps the DB volume. Brief downtime during rebuild.
+            sudo docker compose down || true
+            sudo docker system prune -af || true
+            for svc in backend frontend generator; do
+              sudo docker compose --env-file .env.prod build \$svc
+              sudo docker builder prune -af || true
+            done
+            sudo docker compose --env-file .env.prod up -d
             sudo docker image prune -f
             sudo docker compose ps
           "
