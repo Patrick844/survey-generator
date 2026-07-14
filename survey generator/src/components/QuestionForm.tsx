@@ -47,8 +47,9 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
   const handleTypeChange = (type: QuestionType) => {
     const freshMeta: Metadata = {};
     if (type === "rating")             { freshMeta.min_value = 1; freshMeta.max_value = 5; }
-    if (type === "multiple_selection") freshMeta.max_choices = 3;
     if (type === "free_text")          freshMeta.min_length = 2;
+    // multiple_selection: leave max_choices unset → "pick all that apply".
+    // The admin opts into a cap by entering a number.
     update("type", type);
     update("metadata", freshMeta);
     if (HAS_OPTIONS.includes(type) && form.options.length < 2) {
@@ -194,8 +195,10 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
               max={form.options.length || 10}
               value={meta.max_choices ?? ""}
               onChange={(e) => updateMeta("max_choices", parseInt(e.target.value) || null)}
+              placeholder="No limit"
               className="w-28 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
+            <p className="text-xs text-gray-400 mt-1.5">Leave empty to let employees pick all that apply. Enter a number to cap selections.</p>
           </div>
         )}
 

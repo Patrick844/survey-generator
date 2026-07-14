@@ -83,3 +83,27 @@ def test_show_progress_intent():
     session = service.submit_message(session.session_id, "show progress")
 
     assert "0/2" in session.assistant_message
+
+
+def test_multiple_selection_enforces_max_choices():
+    ai_service = SurveyAIService(llm_service=OpenAILLMService(fake_mode=True))
+    service = SurveyChatbotService(store=MemoryStore(), survey_store=MemoryStore(), ai_service=ai_service)
+    service.set_questions([
+        Question(id="m1", category="Work", question_type="multiple_selection",
+                 prompt="Pick your modes", options=["A. onsite", "B. hybrid", "C. remote"], max_choices=2),
+        Question(id="m2", category="X", question_type="free_text", prompt="Why?", min_length=2),
+    ])
+    session = service.create_session()
+
+    # 3 selections with a cap of 2 must be rejected — stay on Q1, nothing saved.
+    session = service.submit_message(session.session_id, "onsite, hybrid, remote")
+    assert session.current_question is not None
+    assert session.current_question.number == 1
+    assert "m1" not in session.responses
+    assert "up to 2" in session.assistant_message
+
+    # 2 selections are accepted and advance to Q2.
+    session = service.submit_message(session.session_id, "onsite, hybrid")
+    assert session.current_question is not None
+    assert session.current_question.number == 2
+    assert session.responses["m1"]["response"]["values"] == ["A. onsite", "B. hybrid"]
