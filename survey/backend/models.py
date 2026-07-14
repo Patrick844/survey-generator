@@ -31,7 +31,7 @@ class Question(BaseModel):
     min_value: float | None = Field(default=None, description="Minimum allowed numeric value (number / rating types)")
     max_value: float | None = Field(default=None, description="Maximum allowed numeric value (number / rating types)")
     max_choices: int | None = Field(default=None, description="Max selections allowed (multiple_selection type)")
-    min_length: int = Field(default=2, description="Minimum word count required (free_text type)")
+    min_length: int = Field(default=2, description="Minimum character count required (free_text type)")
 
 
 class PublicQuestion(BaseModel):
@@ -43,7 +43,6 @@ class PublicQuestion(BaseModel):
     category: str
     question_type: QuestionType
     prompt: str
-    expected_format: str
     options: list[str] = Field(default_factory=list)
     min_value: float | None = None
     max_value: float | None = None

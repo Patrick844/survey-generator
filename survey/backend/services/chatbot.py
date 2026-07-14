@@ -493,7 +493,6 @@ class SurveyChatbotService:
             category=question.category,
             question_type=question.question_type,
             prompt=question.prompt,
-            expected_format=question.expected_format,
             options=question.options,
             min_value=question.min_value,
             max_value=question.max_value,

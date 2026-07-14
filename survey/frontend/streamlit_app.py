@@ -127,22 +127,27 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
 
     #  Rating 
     elif question_type == "rating":
+        # Fall back to a 1–5 scale if bounds are missing, so the widget always
+        # renders (and never becomes an unbounded rating).
         min_val = current_question.get("min_value")
         max_val = current_question.get("max_value")
-        if min_val is not None and max_val is not None:
-            rating_range = list(range(int(min_val), int(max_val) + 1))
-            st.write(f"**Rate from {min_val} to {max_val}:**")
-            cols = st.columns(len(rating_range))
-            for idx, value in enumerate(rating_range):
-                with cols[idx]:
-                    if st.button(
-                        str(value),
-                        key=f"rating_{question_id}_{value}",
-                        disabled=is_waiting,
-                        use_container_width=True,
-                    ):
-                        queue_user_message(str(value))
-                        st.rerun()
+        lo = int(min_val) if min_val is not None else 1
+        hi = int(max_val) if max_val is not None else 5
+        if hi < lo:
+            hi = lo
+        rating_range = list(range(lo, hi + 1))
+        st.write(f"**Rate from {lo} to {hi}:**")
+        cols = st.columns(len(rating_range))
+        for idx, value in enumerate(rating_range):
+            with cols[idx]:
+                if st.button(
+                    str(value),
+                    key=f"rating_{question_id}_{value}",
+                    disabled=is_waiting,
+                    use_container_width=True,
+                ):
+                    queue_user_message(str(value))
+                    st.rerun()
 
     #  Multiple selection
     elif question_type == "multiple_selection" and options:

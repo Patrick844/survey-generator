@@ -44,6 +44,12 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
   const updateMeta = (key: keyof Metadata, val: Metadata[keyof Metadata]) =>
     setForm((f) => ({ ...f, metadata: { ...f.metadata, [key]: val } }));
 
+  // Empty or non-numeric → null (never NaN, and never drops a legitimate 0).
+  const numOrNull = (v: string): number | null => {
+    const n = Number(v);
+    return v.trim() === "" || Number.isNaN(n) ? null : n;
+  };
+
   const handleTypeChange = (type: QuestionType) => {
     const freshMeta: Metadata = {};
     if (type === "rating")             { freshMeta.min_value = 1; freshMeta.max_value = 5; }
@@ -194,7 +200,7 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
               min={1}
               max={form.options.length || 10}
               value={meta.max_choices ?? ""}
-              onChange={(e) => updateMeta("max_choices", parseInt(e.target.value) || null)}
+              onChange={(e) => updateMeta("max_choices", numOrNull(e.target.value))}
               placeholder="No limit"
               className="w-28 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
@@ -211,7 +217,7 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
                 <p className="text-xs text-gray-400 mb-1">Min</p>
                 <input type="number"
                   value={meta.min_value ?? ""}
-                  onChange={(e) => updateMeta("min_value", parseFloat(e.target.value))}
+                  onChange={(e) => updateMeta("min_value", numOrNull(e.target.value))}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
@@ -220,7 +226,7 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
                 <p className="text-xs text-gray-400 mb-1">Max</p>
                 <input type="number"
                   value={meta.max_value ?? ""}
-                  onChange={(e) => updateMeta("max_value", parseFloat(e.target.value))}
+                  onChange={(e) => updateMeta("max_value", numOrNull(e.target.value))}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
@@ -244,7 +250,7 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
               type="number"
               min={1}
               value={meta.min_length ?? ""}
-              onChange={(e) => updateMeta("min_length", parseInt(e.target.value) || null)}
+              onChange={(e) => updateMeta("min_length", numOrNull(e.target.value))}
               className="w-28 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
