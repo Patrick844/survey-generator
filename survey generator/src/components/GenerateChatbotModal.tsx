@@ -80,11 +80,28 @@ export default function GenerateChatbotModal({ questions, onClose }: GenerateCha
     }
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(surveyUrl).then(() => {
+  const copyLink = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(surveyUrl);
+      } else {
+        // navigator.clipboard is unavailable over plain HTTP (non-secure
+        // context), so fall back to a temporary textarea + execCommand.
+        const textarea = document.createElement("textarea");
+        textarea.value = surveyUrl;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch {
+      setCopied(false);
+    }
   };
 
   return (
