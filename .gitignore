@@ -149,7 +149,16 @@ activemq-data/
 
 # Environments
 .env
+.env.prod
+!.env.prod.example
 .envrc
+
+# SSH / private keys — NEVER commit these
+*.pem
+*.key
+*.ppk
+id_rsa
+id_rsa.*
 .venv
 env/
 venv/

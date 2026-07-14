@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { Question, BackendQuestion, QuestionType } from "../types/models";
 
-const API_BASE = "http://localhost:8000";
+// Backend base URL. Baked in at build time from the VITE_API_BASE env var
+// (see Dockerfile build arg); falls back to localhost for local dev.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 function toBackendQuestion(q: Question): BackendQuestion {
   const qt: QuestionType = q.type;

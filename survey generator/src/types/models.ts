@@ -2,7 +2,6 @@ export type QuestionType =
   | "single_selection"
   | "multiple_selection"
   | "distribution"
-  | "hours_distribution"
   | "number"
   | "rating"
   | "percentage"

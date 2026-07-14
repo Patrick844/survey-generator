@@ -1,0 +1,74 @@
+name: Deploy to EC2
+
+# Runs on every push to main (and can be triggered manually from the Actions tab).
+# It bootstraps Docker on the server, syncs the code, writes the env files from
+# secrets, and (re)builds + restarts the whole stack — DB included.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys run at once.
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
+env:
+  DEPLOY_DIR: /home/ubuntu/survey-generator
+  HOST: ubuntu@${{ secrets.EC2_HOST }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate env files from secrets
+        run: |
+          {
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
+            echo "OPENAI_MODEL=gpt-4o-mini"
+            echo "OPENAI_FAKE_MODE=false"
+          } > survey/.env
+          {
+            echo "VITE_API_BASE=http://${{ secrets.EC2_HOST }}:8000"
+            echo "FRONTEND_URL=http://${{ secrets.EC2_HOST }}:8501"
+          } > .env.prod
+
+      - name: Configure SSH
+        run: |
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+      - name: Bootstrap server (Docker + rsync, idempotent)
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" '
+            set -e
+            # Ubuntu 26.04 has no usable docker.io apt package, so use Docker`s
+            # official install script (adds Docker`s own apt repo + compose plugin).
+            if ! command -v docker >/dev/null 2>&1; then
+              curl -fsSL https://get.docker.com | sudo sh
+            fi
+            command -v rsync >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y rsync)
+            sudo systemctl enable --now docker
+            sudo docker --version && sudo docker compose version
+          '
+
+      - name: Sync code to server
+        run: |
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude "*.pem" \
+            -e "ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            ./ "$HOST:$DEPLOY_DIR/"
+
+      - name: Build and start the stack
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" "
+            set -e
+            cd $DEPLOY_DIR
+            sudo docker compose --env-file .env.prod up -d --build
+            sudo docker compose ps
+          "

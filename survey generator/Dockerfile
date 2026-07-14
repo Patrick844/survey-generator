@@ -3,6 +3,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Backend URL the browser will call. Overridden at build time via
+# `--build-arg VITE_API_BASE=...` (wired through docker-compose). Vite inlines
+# any VITE_* env var into the bundle during `npm run build`.
+ARG VITE_API_BASE=http://localhost:8000
+ENV VITE_API_BASE=$VITE_API_BASE
+
 COPY package*.json ./
 RUN npm ci
 

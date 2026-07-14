@@ -12,7 +12,6 @@ const TYPES: TypeDef[] = [
   { type: "single_selection",   icon: "◉", label: "Single Selection",   desc: "One answer from a list" },
   { type: "multiple_selection",  icon: "☑", label: "Multiple Selection",  desc: "Multiple answers from a list" },
   { type: "distribution",        icon: "⊞", label: "Distribution",        desc: "Distribute a total across categories" },
-  { type: "hours_distribution",  icon: "⏱", label: "Hours Distribution",  desc: "Distribute work hours across categories" },
   { type: "number",              icon: "#", label: "Number",              desc: "A numeric value" },
   { type: "rating",              icon: "★", label: "Rating",              desc: "A score within a range" },
   { type: "percentage",          icon: "%", label: "Percentage",          desc: "A value from 0 to 100" },
@@ -258,14 +257,6 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
                 />
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Hours distribution info */}
-        {form.type === "hours_distribution" && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-            <p className="font-semibold mb-1">Hours Distribution</p>
-            <p>The chatbot will ask the employee to distribute their working hours across the defined categories. Total must add up to their work week.</p>
           </div>
         )}
 

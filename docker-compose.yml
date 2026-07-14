@@ -24,7 +24,9 @@ services:
     environment:
       # Override the .env values that only make sense for local (non-Docker) runs
       DATABASE_URL: postgresql://postgres:postgres@db:5432/survey
-      FRONTEND_URL: http://localhost:8501
+      # Public address employees reach the Streamlit UI at. Defaults to localhost
+      # for local runs; set FRONTEND_URL in the environment to deploy publicly.
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8501}
     ports:
       - "8000:8000"
     depends_on:
@@ -48,6 +50,10 @@ services:
     build:
       context: ./survey generator
       dockerfile: Dockerfile
+      args:
+        # Baked into the React bundle so the admin's browser calls the right
+        # backend. Defaults to localhost; set VITE_API_BASE to deploy publicly.
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
     ports:
       - "3000:80"
     depends_on:

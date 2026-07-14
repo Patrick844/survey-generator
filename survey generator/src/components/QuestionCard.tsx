@@ -4,7 +4,6 @@ const TYPE_META: Record<string, { label: string; cls: string }> = {
   single_selection:    { label: "Single Selection",    cls: "bg-blue-100 text-blue-700" },
   multiple_selection:  { label: "Multiple Selection",  cls: "bg-indigo-100 text-indigo-700" },
   distribution:        { label: "Distribution",        cls: "bg-cyan-100 text-cyan-700" },
-  hours_distribution:  { label: "Hours Distribution",  cls: "bg-amber-100 text-amber-700" },
   number:              { label: "Number",              cls: "bg-violet-100 text-violet-700" },
   rating:              { label: "Rating",              cls: "bg-pink-100 text-pink-700" },
   percentage:          { label: "Percentage",          cls: "bg-green-100 text-green-700" },
