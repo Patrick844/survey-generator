@@ -291,8 +291,9 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
 
     #  Free text — a dedicated multi-line answer box (the chat input also works)
     elif question_type == "free_text":
-        min_len = current_question.get("min_length") or 0
-        st.write("**Your answer:**")
+        min_len = int(current_question.get("min_length") or 0)
+        label = f"**Your answer** (minimum {min_len} characters):" if min_len > 0 else "**Your answer:**"
+        st.write(label)
         text_val = st.text_area(
             "Your answer",
             label_visibility="collapsed",
@@ -300,9 +301,10 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
             key=f"text_{question_id}",
             disabled=is_waiting,
         )
-        long_enough = len(text_val.strip()) >= min_len
+        typed = len(text_val.strip())
+        long_enough = typed >= min_len
         if text_val.strip() and not long_enough:
-            st.caption(f"⚠️ Please write at least {min_len} characters.")
+            st.caption(f"⚠️ {typed}/{min_len} characters — a little more.")
         if st.button("Submit answer", key=f"text_submit_{question_id}", disabled=is_waiting or not text_val.strip() or not long_enough, type="primary"):
             queue_user_message(text_val.strip())
             st.rerun()

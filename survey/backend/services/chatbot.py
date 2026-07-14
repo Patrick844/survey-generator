@@ -498,6 +498,7 @@ class SurveyChatbotService:
             min_value=question.min_value,
             max_value=question.max_value,
             max_choices=question.max_choices,
+            min_length=question.min_length,
         )
 
     def _build_response(self, validated_answer: Any, question_type: str) -> dict[str, Any]:

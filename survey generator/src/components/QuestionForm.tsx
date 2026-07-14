@@ -239,7 +239,7 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
         {/* Min length (free_text) */}
         {form.type === "free_text" && (
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Min Answer Length <span className="text-gray-300 font-normal">(words)</span></label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Min Answer Length <span className="text-gray-300 font-normal">(characters)</span></label>
             <input
               type="number"
               min={1}

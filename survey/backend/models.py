@@ -48,6 +48,7 @@ class PublicQuestion(BaseModel):
     min_value: float | None = None
     max_value: float | None = None
     max_choices: int | None = None
+    min_length: int = 2
 
 
 # ── Chat / session models ─────────────────────────────────────────────────────
