@@ -289,6 +289,24 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
             queue_user_message(f"{int(pct_val)}%")
             st.rerun()
 
+    #  Free text — a dedicated multi-line answer box (the chat input also works)
+    elif question_type == "free_text":
+        min_len = current_question.get("min_length") or 0
+        st.write("**Your answer:**")
+        text_val = st.text_area(
+            "Your answer",
+            label_visibility="collapsed",
+            placeholder="Type your answer here…",
+            key=f"text_{question_id}",
+            disabled=is_waiting,
+        )
+        long_enough = len(text_val.strip()) >= min_len
+        if text_val.strip() and not long_enough:
+            st.caption(f"⚠️ Please write at least {min_len} characters.")
+        if st.button("Submit answer", key=f"text_submit_{question_id}", disabled=is_waiting or not text_val.strip() or not long_enough, type="primary"):
+            queue_user_message(text_val.strip())
+            st.rerun()
+
 
 def render_sidebar(session: dict[str, Any]) -> None:
     with st.sidebar:
