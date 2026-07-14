@@ -2,6 +2,18 @@
 
 An end-to-end workplace survey platform. Admins build surveys visually, employees complete them through a conversational AI chat interface, and all responses are stored in PostgreSQL.
 
+## 🚀 Live Demo (AWS EC2)
+
+Open the admin, add questions, click **Generate Chatbot**, then open the shareable employee link it produces:
+
+| | URL |
+| --- | --- |
+| **Admin — survey builder** | http://13.49.227.37:3000 |
+| **Employee — chat UI** | http://13.49.227.37:8501 |
+| **Backend API (Swagger)** | http://13.49.227.37:8000/docs |
+
+> Demo instance, served over HTTP on a raw IP. If a link doesn't open from an in-app browser (e.g. LinkedIn), copy it into Safari/Chrome.
+
 ---
 
 ## Table of Contents
