@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -208,6 +207,37 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
         if nothing_selected and not is_waiting:
             st.caption("Select at least one option, then click Next.")
 
+    #  Distribution — assign a percentage to each category (must total 100%)
+    elif question_type == "distribution" and options:
+        st.write("**Assign a percentage to each — the total must equal 100%:**")
+        percentages: dict[str, int] = {}
+        for idx, option in enumerate(options):
+            percentages[option] = st.number_input(
+                option,
+                min_value=0,
+                max_value=100,
+                step=5,
+                value=0,
+                key=f"dist_{question_id}_{idx}",
+                disabled=is_waiting,
+            )
+
+        total = sum(percentages.values())
+        if total == 100:
+            st.success(f"Total: {total}%")
+        else:
+            st.info(f"Total: {total}% — adjust so it adds up to 100%")
+
+        if st.button(
+            "Submit answer",
+            key=f"dist_submit_{question_id}",
+            disabled=is_waiting or total != 100,
+            type="primary",
+        ):
+            answer = ", ".join(f"{int(pct)}% {opt}" for opt, pct in percentages.items() if pct > 0)
+            queue_user_message(answer)
+            st.rerun()
+
 
 def render_sidebar(session: dict[str, Any]) -> None:
     with st.sidebar:
@@ -223,14 +253,6 @@ def render_sidebar(session: dict[str, Any]) -> None:
             st.divider()
             st.subheader("Current Question")
             st.write(f"**Category:** {current_question['category']}")
-            st.write(f"**Type:** {current_question['question_type']}")
-            st.write(f"**Expected format:** `{current_question['expected_format']}`")
-
-            options = current_question.get("options") or []
-            if options:
-                st.write("**Options:**")
-                for option in options:
-                    st.write(f"- {option}")
 
         st.divider()
         if st.button("Reset survey", use_container_width=True):
@@ -271,39 +293,36 @@ def render_completion(session: dict[str, Any]) -> None:
     if not session["completed"]:
         return
 
-    st.success("Survey completed successfully.")
-    responses_json = json.dumps(session["responses"], indent=2, ensure_ascii=False)
-
-    with st.expander("View saved responses", expanded=True):
-        st.json(session["responses"])
-
-    st.download_button(
-        label="Download responses JSON",
-        data=responses_json,
-        file_name=f"survey_responses_{session['session_id']}.json",
-        mime="application/json",
-        use_container_width=True,
-    )
+    st.success("🎉 All done — thank you for completing the survey!")
+    st.caption("Your responses have been recorded. You can safely close this window.")
 
 
 def render_landing() -> None:
     survey_id = get_survey_id()
 
-    st.title("Employee Survey")
+    st.title("💬 Employee Survey")
 
+    title = "Employee Survey"
+    total: int | None = None
     if survey_id:
         try:
             survey = api_request("GET", f"/surveys/{survey_id}")
             title = survey.get("title") or "Employee Survey"
             total = survey["total_questions"]
-            st.info(f"**{title}** — {total} questions")
         except ApiError:
-            st.warning("Survey not found. Please check your link.")
+            st.warning("This survey link doesn't look valid. Please double-check the link you were given.")
             return
 
-    st.write("Welcome. Click the button below to begin the survey.")
+    st.subheader(title)
+    if total:
+        st.caption(f"{total} short questions · about a few minutes · answers are saved automatically")
 
-    employee_id = st.text_input("Your name or ID (optional)", placeholder="Optional")
+    st.write(
+        "You'll answer a few questions in a friendly chat — there are no wrong answers, "
+        "just share your honest perspective."
+    )
+
+    employee_id = st.text_input("Your name (optional)", placeholder="You can stay anonymous")
 
     if st.button("Start survey", type="primary", use_container_width=True):
         try:

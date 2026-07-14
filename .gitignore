@@ -250,3 +250,6 @@ lerna-debug.log*
 
 # macOS
 .DS_Store
+
+# Debug screenshots
+Screenshot*.png

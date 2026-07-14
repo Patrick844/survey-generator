@@ -392,7 +392,6 @@ export function bankItemToDraft(category: string, statement: string): QuestionDr
     type: "rating",
     options: [],
     metadata: {
-      expected_format: LIKERT_EXPECTED_FORMAT,
       min_value: LIKERT_MIN,
       max_value: LIKERT_MAX,
     },

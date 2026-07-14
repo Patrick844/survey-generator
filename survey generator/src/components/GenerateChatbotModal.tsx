@@ -13,34 +13,25 @@ function toBackendQuestion(q: Question): BackendQuestion {
   let options: string[] = [];
   let prompt = q.question;
 
-  const distributionMode =
-    qt === "distribution"
-      ? (meta.distribution_mode ?? "coded")
-      : (meta.distribution_mode ?? null);
-
-  if (qt === "distribution" && distributionMode === "coded") {
-    options = opts.map((o) => o.code);
-    if (opts.length > 0) {
-      const lines = opts.map((o) => `${o.code}. ${o.label}`).join("\n");
-      prompt = `${q.question}\n\n${lines}`;
-    }
-  } else if (qt === "distribution" && distributionMode === "labeled") {
+  if (qt === "distribution") {
+    // Named categories — assign a percentage to each (no letter codes).
     options = opts.map((o) => o.label || o.code);
     if (opts.length > 0) {
       const lines = opts.map((o) => `- ${o.label || o.code}`).join("\n");
       prompt = `${q.question}\n\n${lines}`;
     }
-  } else if (qt === "single_selection") {
-    options = opts.map((o) => /^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label);
+  } else if (qt === "single_selection" || qt === "multiple_selection") {
+    const label = (o: { code: string; label: string }) =>
+      /^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label;
+    options = opts.map(label);
     if (opts.length > 0) {
-      const lines = opts.map((o) => /^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label).join("\n");
-      prompt = `${q.question}\n\n${lines}`;
-    }
-  } else if (qt === "multiple_selection") {
-    options = opts.map((o) => /^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label);
-    if (opts.length > 0) {
-      const lines = opts.map((o) => /^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label).join("\n");
-      const maxNote = meta.max_choices ? ` Pick up to ${meta.max_choices}.` : " Pick all that apply.";
+      const lines = opts.map(label).join("\n");
+      const maxNote =
+        qt === "multiple_selection"
+          ? meta.max_choices
+            ? ` Pick up to ${meta.max_choices}.`
+            : " Pick all that apply."
+          : "";
       prompt = `${q.question}${maxNote}\n\n${lines}`;
     }
   }
@@ -50,13 +41,11 @@ function toBackendQuestion(q: Question): BackendQuestion {
     category: q.category,
     question_type: qt,
     prompt,
-    expected_format: meta.expected_format ?? "",
     options,
     min_value: meta.min_value ?? null,
     max_value: meta.max_value ?? null,
     max_choices: meta.max_choices ?? null,
     min_length: meta.min_length ?? 2,
-    distribution_mode: distributionMode,
   };
 }
 
@@ -67,34 +56,27 @@ interface GenerateChatbotModalProps {
 
 export default function GenerateChatbotModal({ questions, onClose }: GenerateChatbotModalProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
   const [surveyUrl, setSurveyUrl] = useState("");
   const [surveyId, setSurveyId] = useState("");
   const [copied, setCopied] = useState(false);
 
   const payload = { questions: questions.map(toBackendQuestion) };
-  const payloadJson = JSON.stringify(payload, null, 2);
 
   const deploy = async () => {
     setStatus("loading");
-    setErrorMsg("");
     try {
       const res = await fetch(`${API_BASE}/surveys`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Server returned ${res.status}: ${text}`);
-      }
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json() as { survey_url: string; survey_id: string };
       setSurveyUrl(data.survey_url);
       setSurveyId(data.survey_id);
       setStatus("success");
-    } catch (err) {
+    } catch {
       setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Unknown error");
     }
   };
 
@@ -177,24 +159,28 @@ export default function GenerateChatbotModal({ questions, onClose }: GenerateCha
           ) : (
             <>
               <p className="text-sm text-gray-500">
-                This will create a new survey with <strong>{questions.length} questions</strong> on the backend at{" "}
-                <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{API_BASE}</code> and return a shareable employee link.
+                This will publish your survey of <strong>{questions.length} question{questions.length === 1 ? "" : "s"}</strong> and
+                generate a shareable link you can send to employees.
               </p>
+
+              <div className="bg-gray-50 border border-gray-100 rounded-xl divide-y divide-gray-100">
+                {questions.map((q, i) => (
+                  <div key={q.id} className="flex items-start gap-3 px-4 py-3">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{q.question || <span className="italic text-gray-400">Untitled question</span>}</p>
+                      <p className="text-xs text-gray-400">{q.category} · {q.type.replace(/_/g, " ")}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
               {status === "error" && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
                   <p className="font-semibold mb-1">Could not reach the chatbot backend</p>
-                  <p className="text-xs font-mono break-all mb-1">{errorMsg}</p>
-                  <p className="text-xs text-red-500">Make sure the backend is running on {API_BASE}</p>
+                  <p className="text-xs text-red-500">Please try again in a moment.</p>
                 </div>
               )}
-
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Payload Preview</p>
-                <pre className="text-xs bg-gray-50 border border-gray-100 rounded-xl p-4 overflow-auto max-h-80 text-gray-600 leading-relaxed">
-                  {payloadJson}
-                </pre>
-              </div>
             </>
           )}
         </div>

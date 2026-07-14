@@ -45,8 +45,7 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
     setForm((f) => ({ ...f, metadata: { ...f.metadata, [key]: val } }));
 
   const handleTypeChange = (type: QuestionType) => {
-    const freshMeta: Metadata = { expected_format: form.metadata?.expected_format };
-    if (type === "distribution")       freshMeta.distribution_mode = "coded";
+    const freshMeta: Metadata = {};
     if (type === "rating")             { freshMeta.min_value = 1; freshMeta.max_value = 5; }
     if (type === "multiple_selection") freshMeta.max_choices = 3;
     if (type === "free_text")          freshMeta.min_length = 2;
@@ -115,17 +114,6 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
           />
         </div>
 
-        {/* Expected format */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Expected Answer Format <span className="text-gray-300 font-normal">(optional)</span></label>
-          <input
-            value={meta.expected_format ?? ""}
-            onChange={(e) => updateMeta("expected_format", e.target.value)}
-            placeholder="e.g. A single letter: A, B, C or D"
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent font-mono"
-          />
-        </div>
-
         {/* Question type */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Question Type</label>
@@ -151,51 +139,28 @@ export default function QuestionForm({ form, setForm, onSave, onClose, isEditing
           </div>
         </div>
 
-        {/* Distribution mode */}
-        {form.type === "distribution" && (
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Distribution Mode</label>
-            <div className="flex gap-2">
-              {(["coded", "labeled"] as const).map((mode) => (
-                <button key={mode} type="button"
-                  onClick={() => updateMeta("distribution_mode", mode)}
-                  className={`flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all cursor-pointer ${
-                    meta.distribution_mode === mode
-                      ? "border-cyan-500 bg-cyan-50 text-cyan-700"
-                      : "border-gray-100 text-gray-500 hover:border-cyan-200"
-                  }`}>
-                  {mode === "coded" ? "Coded (A/B/C…)" : "Labeled (custom names)"}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-1.5">
-              {meta.distribution_mode === "coded"
-                ? "Options use letter codes. Labels are embedded in the question prompt."
-                : "Options use user-defined category names."}
-            </p>
-          </div>
-        )}
-
         {/* Options */}
         {HAS_OPTIONS.includes(form.type) && (
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Options <span className="text-gray-300 font-normal">(min 2)</span>
+              {form.type === "distribution" ? "Categories" : "Options"} <span className="text-gray-300 font-normal">(min 2)</span>
             </label>
             <div className="space-y-2">
               {form.options.map((o, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <input
-                    value={o.code}
-                    onChange={(e) => updateOption(i, "code", e.target.value.toUpperCase())}
-                    maxLength={4}
-                    placeholder="A"
-                    className="w-12 text-center text-sm font-bold text-blue-600 border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
+                  {form.type !== "distribution" && (
+                    <input
+                      value={o.code}
+                      onChange={(e) => updateOption(i, "code", e.target.value.toUpperCase())}
+                      maxLength={4}
+                      placeholder="A"
+                      className="w-12 text-center text-sm font-bold text-blue-600 border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  )}
                   <input
                     value={o.label}
                     onChange={(e) => updateOption(i, "label", e.target.value)}
-                    placeholder={`Option ${i + 1} label`}
+                    placeholder={form.type === "distribution" ? `Category ${i + 1} name` : `Option ${i + 1} label`}
                     className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                   <button

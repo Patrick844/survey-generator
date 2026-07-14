@@ -263,7 +263,7 @@ class PgSurveyStore:
                 max_value         = q.get("max_value") if is_dict else q.max_value,
                 max_choices       = q.get("max_choices") if is_dict else q.max_choices,
                 min_length        = q.get("min_length", 2) if is_dict else q.min_length,
-                distribution_mode = q.get("distribution_mode") if is_dict else q.distribution_mode,
+                distribution_mode = q.get("distribution_mode") if is_dict else None,
             ))
 
         db.commit()

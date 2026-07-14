@@ -45,9 +45,6 @@ export default function QuestionCard({ question, index, total, onEdit, onDelete,
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tm.cls}`}>
               {tm.label}
             </span>
-            {question.type === "distribution" && meta.distribution_mode && (
-              <span className="text-xs italic text-gray-400">{meta.distribution_mode}</span>
-            )}
             {meta.max_choices && (
               <span className="text-xs text-gray-400">max {meta.max_choices} choices</span>
             )}
@@ -71,11 +68,6 @@ export default function QuestionCard({ question, index, total, onEdit, onDelete,
             </div>
           )}
 
-          {meta.expected_format && (
-            <p className="text-xs font-mono text-gray-400 bg-gray-50 rounded px-2 py-1 inline-block">
-              {meta.expected_format}
-            </p>
-          )}
         </div>
 
         {/* Actions (visible on hover) */}

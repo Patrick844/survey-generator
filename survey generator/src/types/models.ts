@@ -13,8 +13,6 @@ export interface Option {
 }
 
 export interface Metadata {
-  expected_format?: string;
-  distribution_mode?: "coded" | "labeled" | null;
   min_value?: number | null;
   max_value?: number | null;
   max_choices?: number | null;
@@ -38,13 +36,11 @@ export interface BackendQuestion {
   category: string;
   question_type: QuestionType;
   prompt: string;
-  expected_format: string;
   options: string[];
   min_value: number | null;
   max_value: number | null;
   max_choices: number | null;
   min_length: number;
-  distribution_mode: "coded" | "labeled" | null;
 }
 
 export interface SetQuestionsRequest {

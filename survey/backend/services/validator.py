@@ -72,16 +72,10 @@ class AnswerValidator:
                 result = ValidationResult(valid=True, normalized_answer={"value": value, "unit": "%"}) if range_result.valid else range_result
 
         elif qt == "distribution":
-            if question.distribution_mode == "coded":
-                if extracted.coded_distribution is None:
-                    result = ValidationResult(valid=False, error="Please use the expected format, for example: A 20%, B 30%, C 50%.")
-                else:
-                    result = self._validate_coded_distribution_structured(extracted.coded_distribution, question)
+            if extracted.labeled_distribution is None:
+                result = ValidationResult(valid=False, error="Please assign a percentage to each category so they add up to 100%.")
             else:
-                if extracted.labeled_distribution is None:
-                    result = ValidationResult(valid=False, error="Please use the expected format, for example: 30% Marketing, 70% external parties.")
-                else:
-                    result = self._validate_labeled_distribution_structured(extracted.labeled_distribution)
+                result = self._validate_labeled_distribution_structured(extracted.labeled_distribution)
 
         elif qt == "hours_distribution":
             if extracted.hours_distribution is None:
@@ -112,24 +106,6 @@ class AnswerValidator:
 
         print(f"[VALIDATOR] Result: {'VALID' if result.valid else 'INVALID'} | error={result.error!r} | stored={result.normalized_answer!r}")
         return result
-
-    def _validate_coded_distribution_structured(self, values: dict[str, float], question: Question) -> ValidationResult:
-        allowed = {opt.upper() for opt in question.options}
-        normalized: dict[str, int | float] = {}
-
-        for raw_code, raw_value in values.items():
-            code = raw_code.upper()
-            if code not in allowed:
-                return ValidationResult(valid=False, error=f"'{code}' is not a valid option for this question.")
-            if code in normalized:
-                return ValidationResult(valid=False, error=f"Option '{code}' was entered more than once.")
-            normalized[code] = self._clean_number(raw_value)
-
-        total = round(sum(values.values()), 2)
-        if total != 100:
-            return ValidationResult(valid=False, error=f"Percentages must add up to 100%. Current total is {total:g}%.")
-
-        return ValidationResult(valid=True, normalized_answer={code: normalized[code] for code in sorted(normalized)})
 
     def _validate_labeled_distribution_structured(self, entries: list) -> ValidationResult:
         if not entries:
@@ -259,36 +235,7 @@ class AnswerValidator:
         return ValidationResult(valid=True, normalized_answer=selected)
 
     def _validate_distribution(self, answer: str, question: Question) -> ValidationResult:
-        if question.distribution_mode == "labeled":
-            return self._validate_labeled_distribution(answer)
-
-        return self._validate_coded_distribution(answer, question)
-
-    def _validate_coded_distribution(self, answer: str, question: Question) -> ValidationResult:
-        # Accepts: A 20%, B 30%, C 50% or A:20 B:30 C:50
-        pattern = re.compile(r"\b([A-Za-z])\b\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*%?")
-        matches = pattern.findall(answer)
-
-        if not matches:
-            return ValidationResult(valid=False, error="Please use the expected format, for example: A 20%, B 30%, C 50%.")
-
-        allowed = {option.upper() for option in question.options}
-        values: dict[str, float] = {}
-
-        for raw_code, raw_value in matches:
-            code = raw_code.upper()
-            if code not in allowed:
-                return ValidationResult(valid=False, error=f"'{code}' is not a valid option for this question.")
-            if code in values:
-                return ValidationResult(valid=False, error=f"Option '{code}' was entered more than once.")
-            values[code] = float(raw_value)
-
-        total = round(sum(values.values()), 2)
-        if total != 100:
-            return ValidationResult(valid=False, error=f"Percentages must add up to 100%. Current total is {total:g}%.")
-
-        normalized = {code: self._clean_number(value) for code, value in sorted(values.items())}
-        return ValidationResult(valid=True, normalized_answer=normalized)
+        return self._validate_labeled_distribution(answer)
 
     def _validate_labeled_distribution(self, answer: str) -> ValidationResult:
         # Accepts: 30% Marketing, 20% Finance - Auditing, 50% external parties

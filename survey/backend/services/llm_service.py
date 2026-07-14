@@ -108,17 +108,10 @@ Rules per type:
 - rating          → extracted_answer.rating       = integer the user stated. Null if unclear.
 - number          → extracted_answer.number       = numeric value (strip "minutes", "min", etc.). Null if unclear.
 - percentage      → extracted_answer.percentage   = numeric value only (no % sign). Null if unclear.
-- distribution (coded, options A B C...)
-                  → extracted_answer.coded_distribution = dict mapping each code to its percentage.
-                    Include ONLY codes the user explicitly mentioned.
-                    If the user gave bare numbers with NO letter codes, set coded_distribution = null.
-- distribution (labeled, free-form labels)
-                  → extracted_answer.labeled_distribution = list of {label, percentage} objects.
-                    Use ONLY labels the user explicitly wrote. Do NOT invent labels.
-                    If the user did not provide labels (e.g. typed only "10" or "50%"), set labeled_distribution = null.
-- hours_distribution
-                  → extracted_answer.hours_distribution = {hours_per_week, individual_work_pct, collaborative_work_pct, other_pct}.
-                    All four fields must come from the user's message. If any are missing, set hours_distribution = null.
+- distribution    → extracted_answer.labeled_distribution = list of {label, percentage} objects,
+                    one per category (e.g. "30% work, 70% meetings"). The labels are the question's
+                    categories. Use ONLY categories/percentages the user provided; do NOT invent them.
+                    If no percentages were given, set labeled_distribution = null.
 - single_selection → extracted_answer.single_selection = the option or code the user chose.
 - multiple_selection → extracted_answer.multiple_selection = list of options/codes chosen.
 - free_text       → extracted_answer.free_text = the user's text verbatim.
@@ -151,32 +144,31 @@ Python validation will reject it and ask the user to resend with the correct for
         print(f"[LLM] note={result.assistant_note!r}")
         return result
 
+    def _question_block(self, question: Question, number: int, total: int) -> str:
+        """Deterministic, always-correct question presentation.
+
+        The 'how to answer' affordance is provided by the interactive widgets in
+        the employee UI, so the message itself only states the question and its
+        options — never machine-invented format hints (which the LLM used to get
+        wrong, e.g. telling people to 'provide 2 letters' on a distribution).
+        """
+        lines = [f"**Question {number} of {total}**", "", question.prompt]
+        if question.options:
+            lines.append("")
+            lines.extend(f"- {option}" for option in question.options)
+        return "\n".join(lines)
+
     def compose_question_message(self, *, question: Question, number: int, total: int, greeting: bool = False) -> str:
+        block = self._question_block(question, number, total)
+        if not greeting:
+            return block
         if self.fake_mode:
-            prefix = "Hey, let's get started.\n\n" if greeting else ""
-            return prefix + self._template_question_message(question=question, number=number, total=total)
-
-        format_guide = self._format_guide(question)
-        prompt = f"""
-Write the next chatbot message for an employee workplace survey.
-
-Requirements:
-- Warm, human, conversational tone — not stiff or robotic.
-- If greeting=true, open with a short welcoming sentence (do NOT use "Hey, let's get started" verbatim).
-- Show the question number: Question {number} of {total}.
-- Include the question text exactly as written.
-- Include the options exactly when provided (list them clearly).
-- Include the format guide below word-for-word in a clearly labelled "How to answer:" section.
-- Keep it concise — no filler phrases like "Great!" or "Wonderful!".
-
-Format guide to include:
-{format_guide}
-
-Data:
-greeting={greeting}
-question={question.model_dump()}
-""".strip()
-        return self._compose_reply(prompt)
+            return "Welcome — thanks for taking a few minutes to share your feedback.\n\n" + block
+        intro = self._compose_reply(
+            "Write ONE short, warm sentence welcoming an employee to a workplace survey. "
+            "Just the opening sentence — no question, no 'Sure', no 'Great'."
+        )
+        return f"{intro}\n\n{block}"
 
     def compose_invalid_message(
         self,
@@ -220,29 +212,16 @@ Options (if any): {question.options}
         user_message: str,
         validated_answer: Any,
     ) -> str:
+        block = self._question_block(next_question, number, total)
         if self.fake_mode:
-            return "Good, your answer was saved.\n\n" + self._template_question_message(
-                question=next_question,
-                number=number,
-                total=total,
-            )
+            return "Thanks, that's saved.\n\n" + block
 
-        prompt = f"""
-Write a chatbot message after a valid survey answer.
-
-Requirements:
-- Briefly acknowledge the employee's specific answer (user_message and validated_answer below) in a natural, warm way — one short sentence. Do not just say "Good, your answer was saved." Reference what they actually said.
-- Then ask the next question.
-- Include: Question {number}/{total}
-- Include the question text exactly.
-- Include the expected format exactly.
-- Include options exactly when provided.
-
-Employee's raw answer: {user_message}
-Validated answer (normalized): {validated_answer}
-Next question data: {next_question.model_dump()}
-""".strip()
-        return self._compose_reply(prompt)
+        ack = self._compose_reply(
+            "In ONE short, warm sentence, acknowledge that an employee's survey answer was received. "
+            "Do not restate their answer verbatim, do not ask anything, no 'Great'/'Wonderful'. "
+            f"For context, their answer was: {user_message}"
+        )
+        return f"{ack}\n\n{block}"
 
     def compose_edit_start_message(
         self,
@@ -433,23 +412,16 @@ Question: {question.model_dump() if question is not None else None}
             )
 
         if qt == "distribution":
-            if question.distribution_mode == "coded":
-                listed = "\n".join(f"  - {o}" for o in opts) if opts else "  (see options above)"
-                example = question.expected_format or (
-                    ", ".join(f"{o} {round(100 // len(opts) if opts else 50)}%" for o in opts[:3]) if opts else "A 40%, B 35%, C 25%"
-                )
-                return (
-                    f"Assign a percentage to each option — they must add up to exactly 100%.\n"
-                    f"Options:\n{listed}\n"
-                    f"Format: [letter] [percentage]%, [letter] [percentage]%, ...\n"
-                    f"Example: {example}"
-                )
-            else:
-                return (
-                    f"List each category with its percentage — they must add up to exactly 100%.\n"
-                    f"Format: [percentage]% [label], [percentage]% [label], ...\n"
-                    f"Example: {question.expected_format or '40% deep work, 35% meetings, 25% admin'}"
-                )
+            listed = "\n".join(f"  - {o}" for o in opts) if opts else "  (see options above)"
+            example = ", ".join(
+                f"{round(100 // len(opts) if opts else 50)}% {o}" for o in opts[:3]
+            ) if opts else "40% deep work, 35% meetings, 25% admin"
+            return (
+                f"Assign a percentage to each category — they must add up to exactly 100%.\n"
+                f"Categories:\n{listed}\n"
+                f"Format: [percentage]% [category], [percentage]% [category], ...\n"
+                f"Example: {example}"
+            )
 
         if qt == "hours_distribution":
             return (
@@ -556,21 +528,14 @@ Question: {question.model_dump() if question is not None else None}
             return ExtractedAnswer(percentage=float(m.group(0))) if m else None
 
         if qt == "distribution":
-            if question.distribution_mode == "coded":
-                pattern = re.compile(r"\b([A-Za-z])\b\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*%?")
-                matches = pattern.findall(cleaned)
-                if not matches:
+            parts = [p.strip() for p in cleaned.split(",") if p.strip()]
+            entries = []
+            for part in parts:
+                m = re.match(r"^(\d+(?:\.\d+)?)\s*%\s+(.+)$", part)
+                if not m:
                     return None
-                return ExtractedAnswer(coded_distribution={code.upper(): float(val) for code, val in matches})
-            else:
-                parts = [p.strip() for p in cleaned.split(",") if p.strip()]
-                entries = []
-                for part in parts:
-                    m = re.match(r"^(\d+(?:\.\d+)?)\s*%\s+(.+)$", part)
-                    if not m:
-                        return None
-                    entries.append(LabeledDistributionEntry(label=m.group(2).strip(), percentage=float(m.group(1))))
-                return ExtractedAnswer(labeled_distribution=entries) if entries else None
+                entries.append(LabeledDistributionEntry(label=m.group(2).strip(), percentage=float(m.group(1))))
+            return ExtractedAnswer(labeled_distribution=entries) if entries else None
 
         if qt == "hours_distribution":
             numbers = [float(v) for v in re.findall(r"\d+(?:\.\d+)?", cleaned)]

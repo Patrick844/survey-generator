@@ -26,16 +26,12 @@ class Question(BaseModel):
     category: str = Field(description="Thematic category, e.g. 'Work-Life Balance'")
     question_type: QuestionType = Field(description="Determines how the chatbot validates the answer")
     prompt: str = Field(description="Full question text shown to the employee (may include embedded options)")
-    expected_format: str = Field(description="Human-readable hint about the expected answer format")
-    options: list[str] = Field(default_factory=list, description="Valid option strings (codes or labels depending on type)")
+    expected_format: str = Field(default="", description="Deprecated — kept for backward compatibility, no longer shown")
+    options: list[str] = Field(default_factory=list, description="Category labels (selection / distribution types)")
     min_value: float | None = Field(default=None, description="Minimum allowed numeric value (number / rating types)")
     max_value: float | None = Field(default=None, description="Maximum allowed numeric value (number / rating types)")
     max_choices: int | None = Field(default=None, description="Max selections allowed (multiple_selection type)")
     min_length: int = Field(default=2, description="Minimum word count required (free_text type)")
-    distribution_mode: Literal["coded", "labeled"] | None = Field(
-        default=None,
-        description="'coded' = predefined letter codes (A/B/C); 'labeled' = custom category names (distribution type only)",
-    )
 
 
 class PublicQuestion(BaseModel):

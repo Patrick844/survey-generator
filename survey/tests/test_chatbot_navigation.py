@@ -1,69 +1,85 @@
-from pathlib import Path
+"""Chatbot session/navigation tests.
 
+Uses the fake LLM mode and an in-memory store, so no OpenAI key or database is
+needed. Questions are set inline via `set_questions`.
+"""
+
+from typing import Any
+
+from backend.models import Question
 from backend.services.ai_service import SurveyAIService
 from backend.services.chatbot import SurveyChatbotService
 from backend.services.llm_service import OpenAILLMService
-from backend.services.storage import JsonSessionStore
 
 
-def make_service(tmp_path: Path) -> SurveyChatbotService:
+class MemoryStore:
+    """In-memory SessionStore/SurveyStore implementation for tests."""
+
+    def __init__(self) -> None:
+        self._data: dict[str, dict[str, Any]] = {}
+
+    def save(self, key: str, payload: dict[str, Any]) -> None:
+        self._data[key] = payload
+
+    def load(self, key: str) -> dict[str, Any] | None:
+        return self._data.get(key)
+
+    def delete(self, key: str) -> bool:
+        return self._data.pop(key, None) is not None
+
+    def list_by_survey(self, survey_id: str) -> list[dict[str, Any]]:
+        return [s for s in self._data.values() if s.get("survey_id") == survey_id]
+
+
+def make_service() -> SurveyChatbotService:
     ai_service = SurveyAIService(llm_service=OpenAILLMService(fake_mode=True))
-    return SurveyChatbotService(store=JsonSessionStore(base_dir=tmp_path), ai_service=ai_service)
+    service = SurveyChatbotService(store=MemoryStore(), survey_store=MemoryStore(), ai_service=ai_service)
+    service.set_questions([
+        Question(id="q01", category="Time", question_type="distribution",
+                 prompt="How is your time divided?", options=["work", "meetings"]),
+        Question(id="q02", category="Satisfaction", question_type="rating",
+                 prompt="Rate your overall satisfaction.", min_value=1, max_value=5),
+    ])
+    return service
 
 
-def test_go_back_to_question_updates_answer_and_returns_to_current_question(tmp_path):
-    service = make_service(tmp_path)
+def test_answer_navigate_back_and_edit():
+    service = make_service()
     session = service.create_session()
 
-    # Answer Q1 and move to Q2.
-    session = service.submit_message(
-        session.session_id,
-        "A 20%, B 20%, C 20%, D 20%, E 10%, F 5%, G 3%, H 2%",
-    )
+    # Answer Q1 (distribution) and advance to Q2.
+    session = service.submit_message(session.session_id, "30% work, 70% meetings")
     assert session.current_question is not None
     assert session.current_question.number == 2
 
-    # Ask to edit Q1. In production this is detected by OpenAI.
+    # Go back to Q1.
     session = service.submit_message(session.session_id, "go back to question 1")
     assert session.current_question is not None
     assert session.current_question.number == 1
     assert "Previous answer" in session.assistant_message
 
-    # Submit updated Q1 answer.
-    session = service.submit_message(
-        session.session_id,
-        "A 10%, B 20%, C 20%, D 20%, E 10%, F 10%, G 5%, H 5%",
-    )
+    # Submit the updated Q1 answer and return to Q2.
+    session = service.submit_message(session.session_id, "50% work, 50% meetings")
     assert session.current_question is not None
     assert session.current_question.number == 2
-    assert session.responses["q01"]["raw_answer"] == "A 10%, B 20%, C 20%, D 20%, E 10%, F 10%, G 5%, H 5%"
-    assert session.responses["q01"]["response"] == {
-        "A": 10,
-        "B": 20,
-        "C": 20,
-        "D": 20,
-        "E": 10,
-        "F": 10,
-        "G": 5,
-        "H": 5,
-    }
+    assert session.responses["q01"]["raw_answer"] == "50% work, 50% meetings"
 
 
-def test_invalid_navigation_question_number_is_handled(tmp_path):
-    service = make_service(tmp_path)
+def test_invalid_navigation_number_is_handled():
+    service = make_service()
     session = service.create_session()
 
     session = service.submit_message(session.session_id, "go back to question 99")
 
     assert session.current_question is not None
     assert session.current_question.number == 1
-    assert "between 1 and 30" in session.assistant_message
+    assert "between 1 and 2" in session.assistant_message
 
 
-def test_show_progress_intent(tmp_path):
-    service = make_service(tmp_path)
+def test_show_progress_intent():
+    service = make_service()
     session = service.create_session()
 
     session = service.submit_message(session.session_id, "show progress")
 
-    assert "0/30" in session.assistant_message
+    assert "0/2" in session.assistant_message
