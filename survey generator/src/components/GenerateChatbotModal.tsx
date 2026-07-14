@@ -10,37 +10,21 @@ function toBackendQuestion(q: Question): BackendQuestion {
   const meta = q.metadata ?? {};
   const opts = q.options ?? [];
 
+  // Options live in the `options` array only — the chat message and the widget
+  // each render them once. Do NOT embed them into the prompt (that caused the
+  // options to appear multiple times).
   let options: string[] = [];
-  let prompt = q.question;
-
   if (qt === "distribution") {
-    // Named categories — assign a percentage to each (no letter codes).
     options = opts.map((o) => o.label || o.code);
-    if (opts.length > 0) {
-      const lines = opts.map((o) => `- ${o.label || o.code}`).join("\n");
-      prompt = `${q.question}\n\n${lines}`;
-    }
   } else if (qt === "single_selection" || qt === "multiple_selection") {
-    const label = (o: { code: string; label: string }) =>
-      /^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label;
-    options = opts.map(label);
-    if (opts.length > 0) {
-      const lines = opts.map(label).join("\n");
-      const maxNote =
-        qt === "multiple_selection"
-          ? meta.max_choices
-            ? ` Pick up to ${meta.max_choices}.`
-            : " Pick all that apply."
-          : "";
-      prompt = `${q.question}${maxNote}\n\n${lines}`;
-    }
+    options = opts.map((o) => (/^[A-Z]$/.test(o.code) ? `${o.code}. ${o.label}` : o.label));
   }
 
   return {
     id: q.id,
     category: q.category,
     question_type: qt,
-    prompt,
+    prompt: q.question,
     options,
     min_value: meta.min_value ?? null,
     max_value: meta.max_value ?? null,

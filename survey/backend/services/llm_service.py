@@ -147,10 +147,10 @@ Python validation will reject it and ask the user to resend with the correct for
     def _question_block(self, question: Question, number: int, total: int) -> str:
         """Deterministic, always-correct question presentation.
 
-        The 'how to answer' affordance is provided by the interactive widgets in
-        the employee UI, so the message itself only states the question and its
-        options — never machine-invented format hints (which the LLM used to get
-        wrong, e.g. telling people to 'provide 2 letters' on a distribution).
+        Shows the question and its options ONCE, so an employee can either tap the
+        interactive widget or type the answer in the chat — both paths work. Never
+        machine-invented format hints (which the LLM used to get wrong, e.g.
+        'provide 2 letters'). The options must NOT also be embedded in the prompt.
         """
         lines = [f"**Question {number} of {total}**", "", question.prompt]
         if question.options:
