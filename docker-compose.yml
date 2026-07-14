@@ -33,15 +33,18 @@ services:
       db:
         condition: service_healthy
 
-  # Streamlit employee chat UI
+  # React employee chat UI (served by nginx). Serves on the same port the
+  # shareable survey links use (8501). The old Streamlit UI still lives in
+  # ./survey (Dockerfile.frontend) for rollback.
   frontend:
     build:
-      context: ./survey
-      dockerfile: Dockerfile.frontend
-    environment:
-      BACKEND_URL: http://backend:8000
+      context: ./survey-employee
+      dockerfile: Dockerfile
+      args:
+        # Baked into the bundle so the employee's browser calls the right backend.
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
     ports:
-      - "8501:8501"
+      - "8501:80"
     depends_on:
       - backend
 
