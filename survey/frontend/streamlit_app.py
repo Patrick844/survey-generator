@@ -147,50 +147,51 @@ def render_answer_buttons(session: dict[str, Any], is_waiting: bool) -> None:
     #  Multiple selection
     elif question_type == "multiple_selection" and options:
         max_choices = current_question.get("max_choices")
+        max_n = int(max_choices) if max_choices else None
         state_key = get_multi_select_key(question_id)
 
-        
         if state_key not in st.session_state:
             st.session_state[state_key] = set()
 
         selected: set = st.session_state[state_key]
 
-        if max_choices:
-            st.write(f"**Choose up to {max_choices} options** (click to select/deselect):")
+        if max_n:
+            st.write(f"**Choose up to {max_n}** (click to select/deselect):")
         else:
             st.write("**Choose all that apply** (click to select/deselect):")
 
-        
+        at_limit = max_n is not None and len(selected) >= max_n
+
         cols = st.columns(min(len(options), 3))
         for idx, option in enumerate(options):
             col = cols[idx % len(cols)]
             with col:
                 is_selected = option in selected
+                # Once the limit is reached, unselected options are disabled so
+                # the cap is both enforced and visible.
+                disabled = is_waiting or (at_limit and not is_selected)
                 btn_type = "primary" if is_selected else "secondary"
                 label = f"✓ {option}" if is_selected else option
 
                 if st.button(
                     label,
                     key=f"multi_{question_id}_{idx}_{option}",
-                    disabled=is_waiting,
+                    disabled=disabled,
                     type=btn_type,
                     use_container_width=True,
                 ):
                     if is_selected:
-                        # Deselect
                         selected.discard(option)
                     else:
-                        # Select 
-                        if max_choices and len(selected) >= int(max_choices):
-                            st.warning(f"You can only select up to {max_choices} options.")
-                        else:
-                            selected.add(option)
-                    
+                        selected.add(option)
                     st.session_state[state_key] = selected
                     st.rerun()
 
-        # Next button 
-        st.write("")  
+        if at_limit:
+            st.caption(f"Maximum of {max_n} reached — deselect one to pick a different option.")
+
+        # Next button
+        st.write("")
         nothing_selected = len(selected) == 0
         if st.button(
             "Next →",
@@ -345,10 +346,12 @@ def main() -> None:
 
     render_sidebar(session)
 
-    # While waiting, don't redraw the old conversation (the question just
-    # answered) or the stale buttons/input. Show only the user's answer and an
-    # animated loader, then process and rerun to reveal the next question.
+    # While waiting, keep the full conversation visible, append the message the
+    # user just sent, and show a "Thinking…" spinner beneath it while the backend
+    # works — then rerun to reveal the reply. (Buttons/input are hidden so the
+    # user can't submit twice.)
     if is_waiting:
+        render_chat(session)
         render_pending_exchange_and_process()
         return
 
