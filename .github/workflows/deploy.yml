@@ -41,6 +41,17 @@ jobs:
           printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > "$HOME/.ssh/deploy_key"
           chmod 600 "$HOME/.ssh/deploy_key"
 
+      - name: Reclaim disk space on the server
+        run: |
+          # The root volume is small; old image versions and build cache from
+          # previous deploys pile up and eventually fill it. Prune first (images
+          # in use by running containers are kept), before apt/rsync/build write.
+          ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" '
+            sudo docker system prune -af || true
+            sudo docker builder prune -af || true
+            df -h /
+          '
+
       - name: Bootstrap server (Docker + rsync, idempotent)
         run: |
           ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" '
@@ -70,5 +81,7 @@ jobs:
             set -e
             cd $DEPLOY_DIR
             sudo docker compose --env-file .env.prod up -d --build
+            # The just-replaced image versions are now dangling — drop them too.
+            sudo docker image prune -f
             sudo docker compose ps
           "
