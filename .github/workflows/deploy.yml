@@ -31,8 +31,10 @@ jobs:
             echo "OPENAI_FAKE_MODE=false"
           } > survey/.env
           {
-            echo "VITE_API_BASE=http://${{ secrets.EC2_HOST }}:8000"
-            echo "FRONTEND_URL=http://${{ secrets.EC2_HOST }}:8501"
+            # Public HTTPS domains served by Caddy on the instance - NOT raw
+            # IP/ports. Baked into the React bundles at build time.
+            echo "VITE_API_BASE=https://survey-api.patricksaade.dev"
+            echo "FRONTEND_URL=https://survey-chat.patricksaade.dev"
           } > .env.prod
 
       - name: Configure SSH
