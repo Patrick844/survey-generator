@@ -4,8 +4,6 @@ import Header from "./components/Header";
 import QuestionList from "./components/QuestionList";
 import QuestionForm from "./components/QuestionForm";
 import GenerateChatbotModal from "./components/GenerateChatbotModal";
-import AddQuestionChoice from "./components/AddQuestionChoice";
-import QuestionLibrary from "./components/QuestionLibrary";
 import "./App.css";
 
 const MAX_QUESTIONS = 4;
@@ -28,44 +26,14 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [choiceOpen, setChoiceOpen] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<QuestionDraft>(emptyForm());
 
-  // "Add Question" first asks how: blank or from the 300-item library.
-  const openAdd = () => setChoiceOpen(true);
-
-  const openBlankForm = () => {
-    setChoiceOpen(false);
+  // "Add Question" opens the blank creation form directly.
+  const openAdd = () => {
     setEditingId(null);
     setForm(emptyForm());
     setPanelOpen(true);
-  };
-
-  const openLibrary = () => {
-    setChoiceOpen(false);
-    setLibraryOpen(true);
-  };
-
-  // Appends a question as-is (used by the locked library flow). Uses the
-  // functional updater so the id and the MAX cap read the latest list.
-  const addQuestionFromDraft = (draft: QuestionDraft) => {
-    setQuestions((prev) => {
-      if (prev.length >= MAX_QUESTIONS) return prev;
-      const newQ: Question = {
-        id: `q${String(prev.length + 1).padStart(2, "0")}`,
-        survey_id: SURVEY_ID,
-        ...draft,
-      };
-      return [...prev, newQ];
-    });
-  };
-
-  // Library picks are locked: selecting adds the question as-is, no edit step.
-  // The library stays open so several can be picked in a row.
-  const selectFromLibrary = (draft: QuestionDraft) => {
-    addQuestionFromDraft(draft);
   };
 
   const openEdit = (q: Question) => {
@@ -151,25 +119,6 @@ export default function App() {
             isEditing={!!editingId}
           />
         </>
-      )}
-
-      {choiceOpen && (
-        <AddQuestionChoice
-          onBlank={openBlankForm}
-          onLibrary={openLibrary}
-          onClose={() => setChoiceOpen(false)}
-        />
-      )}
-
-      {libraryOpen && (
-        <QuestionLibrary
-          usedStatements={questions.map((q) => q.question)}
-          canAdd={canAdd}
-          count={questions.length}
-          max={MAX_QUESTIONS}
-          onSelect={selectFromLibrary}
-          onClose={() => setLibraryOpen(false)}
-        />
       )}
 
       {showExport && (
